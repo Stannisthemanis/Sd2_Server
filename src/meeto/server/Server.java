@@ -1,7 +1,5 @@
 package meeto.server;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -13,10 +11,11 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
+import java.rmi.RMISecurityManager;
 import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
+
+import meeto.rmiserver.RmiServerInterface;
+
 
 /**
  * The Class Server.
@@ -26,9 +25,9 @@ import java.util.Date;
  *
  */
 public class Server {
-	
+
 	/** The online users. */
-	public static ArrayList<Connection>	onlineUsers	= new ArrayList<Connection>();
+//	public static ArrayList<Connection>	onlineUsers	= new ArrayList<Connection>();
 	
 	/** The data base server. */
 	public static RmiServerInterface	dataBaseServer;
@@ -40,6 +39,10 @@ public class Server {
 	 *            the arguments
 	 */
 	public static void main(String[] args) {
+
+		System.getProperties().put("java.security.policy", "policy.all");
+		System.setSecurityManager(new RMISecurityManager());
+		
 		String hostname = null;
 		while (true) {
 			try {
@@ -121,7 +124,7 @@ public class Server {
 		
 		// Thread para responder ao 2o servidor que este ainda esta up
 		new respondToSecundary();
-		
+		System.out.println("gagaga");
 		connectToRmi();
 		
 		// Aceitar novas connecçoes de cliente e lidar com elas
@@ -171,15 +174,18 @@ public class Server {
 		int serverPort = 6000;
 		Socket test = null;
 		String hostname = null;
+		System.out.println("a");
 		try {
 			test = new Socket("localhost", serverPort);
 			hostname = "localhost";
 		} catch (IOException e) {
 			try {
+				System.out.println("b");
 				test = new Socket("Roxkax", serverPort);
 				hostname = "Roxkax";
 			} catch (IOException e1) {
 				try {
+					System.out.println("c");
 					test = new Socket("ricardo", serverPort);
 					hostname = "ricardo";
 				} catch (IOException e2) {
