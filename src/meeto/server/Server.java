@@ -1,5 +1,7 @@
 package meeto.server;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -13,6 +15,9 @@ import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RMISecurityManager;
 import java.rmi.RemoteException;
+import java.util.Date;
+import java.util.ArrayList;
+import java.util.Calendar;
 
 import meeto.rmiserver.RmiServerInterface;
 
@@ -27,7 +32,7 @@ import meeto.rmiserver.RmiServerInterface;
 public class Server {
 
 	/** The online users. */
-//	public static ArrayList<Connection>	onlineUsers	= new ArrayList<Connection>();
+	public static ArrayList<Connection>	onlineUsers	= new ArrayList<Connection>();
 	
 	/** The data base server. */
 	public static RmiServerInterface	dataBaseServer;
@@ -57,7 +62,7 @@ public class Server {
 		}
 		
 	}
-	
+		
 	/**
 	 * Check if main server alive.
 	 *
@@ -124,7 +129,6 @@ public class Server {
 		
 		// Thread para responder ao 2o servidor que este ainda esta up
 		new respondToSecundary();
-		System.out.println("gagaga");
 		connectToRmi();
 		
 		// Aceitar novas connecçoes de cliente e lidar com elas
@@ -292,8 +296,8 @@ class Connection extends Thread {
 						out.writeBoolean(false);
 					}
 					read = null;
-				} else if (read.split(",").length == 6) {
-					this.user = Server.dataBaseServer.registerNewUser(read.replaceAll(",", "-"));
+				} else if (read.split(",").length == 3) {
+					this.user = Server.dataBaseServer.registerNewUser(read);
 					if (this.user == null)
 						out.writeBoolean(false);
 					else
@@ -337,107 +341,87 @@ class Connection extends Thread {
 						request = 0;
 						break;
 					case 4:
-						sendMeetingResume(1);
+						sendMeetingResume();
 						request = 0;
 						break;
 					case 5:
-						sendMeetingResume(2);
+						sendListOfAgendaItensFromMeeting();
 						request = 0;
 						break;
 					case 6:
-						sendListOfAgendaItensFromAMeeting(1);
-						request = 0;
-						break;
-					case 7:
-						sendListOfAgendaItensFromAMeeting(2);
-						request = 0;
-						break;
-					case 8:
 						sendListOfMessagesOfUser();
 						request = 0;
 						break;
-					case 9:
+					case 7:
 						replyToMessage();
 						request = 0;
 						break;
-					case 10:
+					case 8:
 						sendNumberOfMessagesUser();
 						request = 0;
 						break;
-					case 11:
+					case 9:
 						addNewAgendaItemToMeeting();
 						request = 0;
 						break;
-					case 12:
+					case 10:
 						removeAgendaItemFromMeeting();
 						request = 0;
 						break;
-					case 13:
+					case 11:
 						modifyTitleAgendaItem();
 						request = 0;
 						break;
-					case 14:
+					case 12:
 						addKeyDecisionToAgendaItem();
 						request = 0;
 						break;
-					case 15:
+					case 13:
 						addActionItemToMeeting();
 						request = 0;
 						break;
-					case 16:
+					case 14:
 						sendSizeOfTodoOfUser();
 						request = 0;
 						break;
-					case 17:
+					case 15:
 						sendListOfActionItensOfUser();
 						request = 0;
 						break;
-					case 18:
+					case 16:
 						setActionAsDone();
 						request = 0;
 						break;
-					case 19:
+					case 17:
 						sendListCurrentMeetingsOfUser();
 						request = 0;
 						break;
-					case 20:
-						sendMeetingResume(3);
+					case 18:
+						sendListActionItensFromMeeting();
 						request = 0;
 						break;
-					case 21:
-						sendListOfAgendaItensFromAMeeting(3);
-						request = 0;
-						break;
-					case 22:
-						sendListActionItensFromMeeting(1);
-						request = 0;
-						break;
-					case 23:
+					case 19:
 						sendChatHistoryFromAgendaItem();
 						request = 0;
 						break;
-					case 24:
+					case 20:
 						addMessageToAgendaItemChat();
 						request = 0;
 						break;
-					case 25:
+					case 21:
 						testIfUserExists();
 						request = 0;
 						break;
-					case 26:
+					case 22:
 						removeUserFromChat();
 						request = 0;
 						break;
-					case 27:
+					case 23:
 						sendChatFromPassedMeeting();
 						request = 0;
 						break;
-					case 28:
+					case 24:
 						inviteUserToMeeting();
-						request = 0;
-						break;
-					case 29:
-						sendListActionItensFromMeeting(2);
 						request = 0;
 						break;
 				}
@@ -558,11 +542,7 @@ class Connection extends Thread {
 		}
 	}
 	
-	/**
-	 * @param flag
-	 *            1:FutureMeeting 2:PassedMeeting 3:CurrentMeeting
-	 */
-	public void sendMeetingResume(int flag) {
+	public void sendMeetingResume() {
 		System.out.println("\n->> Server: Received request to send meeting information from " + this.user);
 		int meeting = -1;
 		boolean sucess = false;
@@ -572,7 +552,7 @@ class Connection extends Thread {
 				if (meeting == -1)
 					meeting = in.read();
 				System.out.println("->> Server: Sending meeting info to " + this.user);
-				out.writeUTF(Server.dataBaseServer.getMeetingResume(flag, meeting, this.user));
+				out.writeUTF(Server.dataBaseServer.getMeetingResume(meeting));
 				sucess = true;
 			} catch (RemoteException e) {
 				try {
@@ -589,11 +569,7 @@ class Connection extends Thread {
 		
 	}
 	
-	/**
-	 * @param flag
-	 *            1:FutureMeeting 2:PassedMeeting 3:CurrentMeeting
-	 */
-	public void sendListOfAgendaItensFromAMeeting(int flag) {
+	public void sendListOfAgendaItensFromMeeting() {
 		System.out.println("\n->> Server: Received request to send agenda itens from a meeting  " + user);
 		int n = -1;
 		boolean sucess = false;
@@ -603,7 +579,7 @@ class Connection extends Thread {
 				if (n == -1)
 					n = in.read();
 				System.out.println("->> Server: Sending agenda itens of meeting.. ");
-				out.writeUTF(Server.dataBaseServer.getListOfAgendaItensFromMeeting(flag, n, user));
+				out.writeUTF(Server.dataBaseServer.getListOfAgendaItensFromMeeting(n));
 				System.out.println("->> Server Info send with sucess..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -626,7 +602,7 @@ class Connection extends Thread {
 		while (sucess == false) {
 			try {
 				System.out.println("->> Server: Sending messages of " + user);
-				out.writeUTF(Server.dataBaseServer.getListOfMessagesUser(user));
+				out.writeUTF(Server.dataBaseServer.getListOfInvitesByUser(user));
 				System.out.println("->> Server: Messages send with sucess ");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -655,13 +631,13 @@ class Connection extends Thread {
 				if (n == -1)
 					n = in.read();
 				System.out.println("->> Server: Sending message resume..");
-				out.writeUTF(Server.dataBaseServer.getResumeOfMessage(user, n));
+				out.writeUTF(Server.dataBaseServer.getMeetingResume(n));
 				System.out.println("->> Server: Waiting for USER to decline or accept..");
 				if (readedReply == false) {
 					reply = in.readBoolean();
 					readedReply = true;
 				}
-				out.writeBoolean(Server.dataBaseServer.setReplyOfInvite(user, n, reply));
+				out.writeBoolean(Server.dataBaseServer.setReplyOfInvite(n, reply));
 				System.out.println("->> Server: Answer received with sucess");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -684,7 +660,7 @@ class Connection extends Thread {
 		System.out.println("\n->> Server: Received request to send number of messages of USER " + user);
 		while (sucess == false) {
 			try {
-				out.write(Server.dataBaseServer.getNumberOfMessages(user));
+				out.write(Server.dataBaseServer.getNumberOfInvites(user));
 				sucess = true;
 			} catch (RemoteException e) {
 				try {
@@ -713,7 +689,7 @@ class Connection extends Thread {
 				if (newItem == null)
 					newItem = in.readUTF();
 				System.out.println("->> Server: Info received add agenda item now ..");
-				out.writeBoolean(Server.dataBaseServer.addAgendaItemToMeeting(n, newItem, user));
+				out.writeBoolean(Server.dataBaseServer.addAgendaItemToMeeting(n, newItem));
 				System.out.println("->> Server: New agenda item added with sucess ..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -732,7 +708,6 @@ class Connection extends Thread {
 	}
 	
 	public void removeAgendaItemFromMeeting() {
-		int numAgendaItem = -1;
 		int n = -1;
 		boolean sucess = false;
 		while (sucess == false) {
@@ -741,10 +716,8 @@ class Connection extends Thread {
 				System.out.println("->> Server: Waiting for the info of agenda item to remove..");
 				if (n == -1)
 					n = in.read();
-				if (numAgendaItem == -1)
-					numAgendaItem = in.read();
 				System.out.println("->> Server: Info received, removing agenda item now ..");
-				out.writeBoolean(Server.dataBaseServer.removeAgendaItemFromMeeting(n, numAgendaItem, user));
+				out.writeBoolean(Server.dataBaseServer.removeAgendaItemFromMeeting(n));
 				System.out.println("->> Server: Agenda item removed with sucess ..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -762,7 +735,6 @@ class Connection extends Thread {
 	}
 	
 	public void modifyTitleAgendaItem() {
-		int numAgendaItem = -1;
 		int n = -1;
 		String newAgendaItem = null;
 		boolean sucess = false;
@@ -772,12 +744,10 @@ class Connection extends Thread {
 				System.out.println("->> Server: Waiting for the info of agenda item to modify..");
 				if (n == -1)
 					n = in.read();
-				if (numAgendaItem == -1)
-					numAgendaItem = in.read();
 				System.out.println("->> Server: Info received Waiting for new agenda itemToDiscuss now ..");
 				if (newAgendaItem == null)
 					newAgendaItem = in.readUTF();
-				out.writeBoolean(Server.dataBaseServer.modifyTitleAgendaItem(n, numAgendaItem, newAgendaItem, user));
+				out.writeBoolean(Server.dataBaseServer.modifyTitleAgendaItem(n, newAgendaItem));
 				System.out.println("->> Server: Agenda item changed with sucess ..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -795,7 +765,6 @@ class Connection extends Thread {
 	}
 	
 	public void addKeyDecisionToAgendaItem() {
-		int numAgendaItem = -1;
 		int n = -1;
 		String newKeyDecision = null;
 		boolean sucess = false;
@@ -805,13 +774,11 @@ class Connection extends Thread {
 				System.out.println("->> Server: Waiting for the info of agenda item to modify..");
 				if (n == -1)
 					n = in.read();
-				if (numAgendaItem == -1)
-					numAgendaItem = in.read();
 				System.out.println("->> Server: Info received Waiting for key decision now ..");
 				if (newKeyDecision == null) {
 					newKeyDecision = in.readUTF();
 				}
-				out.writeBoolean(Server.dataBaseServer.addKeyDecisionToAgendaItem(n, numAgendaItem, newKeyDecision, user));
+				out.writeBoolean(Server.dataBaseServer.addKeyDecisionToAgendaItem(n, newKeyDecision));
 				System.out.println("->> Server: Agenda item changed with sucess ..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -830,6 +797,7 @@ class Connection extends Thread {
 	
 	public void addActionItemToMeeting() {
 		String newItem = null;
+		String responsableUSer = null;
 		int n = -1;
 		boolean sucess = false;
 		while (sucess == false) {
@@ -840,8 +808,10 @@ class Connection extends Thread {
 					n = in.read();
 				if (newItem == null)
 					newItem = in.readUTF();
+				if (responsableUSer == null)
+					responsableUSer = in.readUTF();
 				System.out.println("->> Server: Info received add action item now ..");
-				out.writeBoolean(Server.dataBaseServer.addActionItemToMeeting(n, newItem, user));
+				out.writeBoolean(Server.dataBaseServer.addActionItemToMeeting(n, newItem, responsableUSer));
 				System.out.println("->> Server: New action item added with sucess ..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -921,7 +891,7 @@ class Connection extends Thread {
 					readedReply = true;
 				}
 				if (reply) {
-					out.writeBoolean(Server.dataBaseServer.setActionAsCompleted(user, n));
+					out.writeBoolean(Server.dataBaseServer.setActionAsCompleted(n));
 					System.out.println("->> Server: Action set as completed with sucess");
 				} else {
 					out.writeBoolean(false);
@@ -942,12 +912,9 @@ class Connection extends Thread {
 		}
 		
 	}
-	
-	/**
-	 * @param flag
-	 *            1:CurrentMeeting 2:PassedMeeting 
-	 */
-	public void sendListActionItensFromMeeting(int flag) {
+
+	public void sendListActionItensFromMeeting() {
+
 		System.out.println("\n->> Server: Received request to send action itens from a meeting  " + user);
 		int n = -1;
 		boolean sucess = false;
@@ -958,7 +925,7 @@ class Connection extends Thread {
 					n = in.read();
 				}
 				System.out.println("->> Server: Sending agenda itens of meeting.. ");
-				out.writeUTF(Server.dataBaseServer.getListActionItensFromMeeting(n, user, flag));
+				out.writeUTF(Server.dataBaseServer.getListActionItensFromMeeting(n));
 				System.out.println("->> Server Info send with sucess..");
 				sucess = true;
 			} catch (RemoteException e) {
@@ -976,7 +943,6 @@ class Connection extends Thread {
 	}
 	
 	public void sendChatHistoryFromAgendaItem() {
-		int numAgendaItem = -1;
 		int n = -1;
 		boolean sucess = false;
 		synchronized (Server.dataBaseServer) {
@@ -987,14 +953,11 @@ class Connection extends Thread {
 					if (n == -1) {
 						n = in.read();
 					}
-					if (numAgendaItem == -1) {
-						numAgendaItem = in.read();
-					}
 					System.out.println("->> Server: Info received sending messages now ..");
-					out.writeUTF(Server.dataBaseServer.getChatHistoryFromAgendaItem(n, numAgendaItem, user));
+					out.writeUTF(Server.dataBaseServer.getChatHistoryFromAgendaItem(n));
 					System.out.println("->> Server: Agenda item messages sended with sucess ..");
 					sucess = true;
-					addClientToChat(n, numAgendaItem, user);
+					Server.dataBaseServer.addClientToChat(n, user);
 				} catch (RemoteException e) {
 					try {
 						Server.connectToRmi();
@@ -1009,48 +972,13 @@ class Connection extends Thread {
 			}
 		}
 	}
-	
-	private void addClientToChat(int n, int numAgendaItem, String username) {
-		try {
-			Server.dataBaseServer.addClientToChat(n, numAgendaItem, user);
-			ArrayList<Connection> clientsOnChat = new ArrayList<Connection>();
-			for (Connection userOn : Server.onlineUsers) {
-				if (Server.dataBaseServer.testIfUserIsOnChat(n, numAgendaItem, userOn.user)) {
-					clientsOnChat.add(userOn);
-				}
-			}
-			for (Connection outs : clientsOnChat) {
-				System.out.println("->> Server: Broadcasting message to " + outs.user);
-				outs.out.writeUTF("\n>>: \n*** " + user + " as entered the chat \n***");
-			}
-		} catch (RemoteException e) {
-			try {
-				Server.connectToRmi();
-			} catch (IOException e1) {
-				System.out.println("*** Reconnecting to rmiServer" + e1.getMessage());
-			}
-		} catch (IOException e) {
-			disconnectClient();
-			System.out.println("\n*** Receiving meeting number for agenda item... " + e.getMessage());
-			return;
-		}
-
-		
-		
-	}
-
+			
 	public void addMessageToAgendaItemChat() {
-		int numAgendaItem = -1;
 		int n = -1;
 		boolean sucess = false;
 		String messageReaded = null;
-		Calendar now = Calendar.getInstance();
-		now.setTime(new Date());
-		now.add(Calendar.MONTH, 1);
 		synchronized (Server.dataBaseServer) {
 			while (sucess == false) {
-				String messageAdded = now.get(Calendar.DAY_OF_MONTH) + "/" + now.get(Calendar.MONTH) + "/" + now.get(Calendar.YEAR) + " " + now.get(Calendar.HOUR) + ":" + now.get(Calendar.MINUTE)
-						+ " -> " + user + ": ";
 				ArrayList<Connection> clientsOnChat = new ArrayList<Connection>();
 				try {
 					System.out.println("\n->> Server: Received request add messages to agenda item ..");
@@ -1058,25 +986,20 @@ class Connection extends Thread {
 					if (n == -1) {
 						n = in.read();
 					}
-					System.out.println("->> Server: Waiting for the info of agenda to add message..");
-					if (numAgendaItem == -1) {
-						numAgendaItem = in.read();
-					}
 					System.out.println("->> Server: Info of agenda item received waiting for message now ..");
 					if (messageReaded == null) {
 						messageReaded = in.readUTF();
 					}
 					System.out.println("->> Server: Message received, adding message now..");
-					messageAdded += messageReaded;
-					if (Server.dataBaseServer.addMessageToChat(n, numAgendaItem, user, messageAdded.concat("\n"))) {
+					if (Server.dataBaseServer.addMessageToChat(n, user, messageReaded.concat("\n"))) {
 						for (Connection userOn : Server.onlineUsers) {
-							if (Server.dataBaseServer.testIfUserIsOnChat(n, numAgendaItem, userOn.user)) {
+							if (Server.dataBaseServer.testIfUserIsOnChat(n, userOn.user)) {
 								clientsOnChat.add(userOn);
 							}
 						}
 						for (Connection outs : clientsOnChat) {
 							System.out.println("->> Server: Broadcasting message to " + outs.user);
-							outs.out.writeUTF(messageAdded.concat("\n"));
+							outs.out.writeUTF(messageReaded.concat("\n"));
 						}
 					} else
 						System.out.println("->> Server: Message not send with sucess ..");
@@ -1120,7 +1043,6 @@ class Connection extends Thread {
 	}
 	
 	public void sendChatFromPassedMeeting() {
-		int numAgendaItem = -1;
 		int n = -1;
 		boolean sucess = false;
 		while (sucess == false) {
@@ -1129,10 +1051,8 @@ class Connection extends Thread {
 				System.out.println("->> Server: Waiting for the info of agenda item to send messages..");
 				if (n == -1)
 					n = in.read();
-				if (numAgendaItem == -1)
-					numAgendaItem = in.read();
 				System.out.println("->> Server: Info received,sending messages now ..");
-				out.writeUTF(Server.dataBaseServer.getMessagesFromPassedMeeting(n, numAgendaItem, user));
+				out.writeUTF(Server.dataBaseServer.getChatHistoryFromAgendaItem(n));
 				sucess = true;
 				System.out.println("->> Server: Agenda item messages sended with sucess ..");
 			} catch (RemoteException e) {
@@ -1159,7 +1079,7 @@ class Connection extends Thread {
 					n = in.read();
 				if (invitedUser == null)
 					invitedUser = in.readUTF();
-				out.writeBoolean(Server.dataBaseServer.inviteUserToMeeting(n, invitedUser, user));
+				out.writeBoolean(Server.dataBaseServer.inviteUserToMeeting(invitedUser,n));
 				sucess = true;
 			} catch (RemoteException e) {
 				try {
@@ -1217,3 +1137,4 @@ class Connection extends Thread {
 		}
 	}
 }
+
