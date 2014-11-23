@@ -21,7 +21,6 @@ import java.util.Calendar;
 
 import meeto.rmiserver.RmiServerInterface;
 
-
 /**
  * The Class Server.
  */
@@ -30,7 +29,7 @@ import meeto.rmiserver.RmiServerInterface;
  *
  */
 public class Server {
-
+	
 	/** The online users. */
 	public static ArrayList<Connection>	onlineUsers	= new ArrayList<Connection>();
 	
@@ -44,7 +43,7 @@ public class Server {
 	 *            the arguments
 	 */
 	public static void main(String[] args) {
-
+		
 		System.getProperties().put("java.security.policy", "policy.all");
 		System.setSecurityManager(new RMISecurityManager());
 		
@@ -62,7 +61,7 @@ public class Server {
 		}
 		
 	}
-		
+	
 	/**
 	 * Check if main server alive.
 	 *
@@ -130,7 +129,6 @@ public class Server {
 		// Thread para responder ao 2o servidor que este ainda esta up
 		new respondToSecundary();
 		connectToRmi();
-		
 		// Aceitar novas connecçoes de cliente e lidar com elas
 		while (true) {
 			Socket clientSocket = listenSocket.accept();
@@ -178,18 +176,15 @@ public class Server {
 		int serverPort = 6000;
 		Socket test = null;
 		String hostname = null;
-		System.out.println("a");
 		try {
 			test = new Socket("localhost", serverPort);
 			hostname = "localhost";
 		} catch (IOException e) {
 			try {
-				System.out.println("b");
 				test = new Socket("Roxkax", serverPort);
 				hostname = "Roxkax";
 			} catch (IOException e1) {
 				try {
-					System.out.println("c");
 					test = new Socket("ricardo", serverPort);
 					hostname = "ricardo";
 				} catch (IOException e2) {
@@ -424,9 +419,14 @@ class Connection extends Thread {
 						inviteUserToMeeting();
 						request = 0;
 						break;
+					default:
+						out.writeBoolean(false);
+						request = 0;
+						break;
 				}
 			} catch (EOFException e) {
 				System.out.println("\n*** EOF Receiving request from " + user + ": " + e.getMessage());
+				disconnectClient();
 				return;
 			} catch (RemoteException e) {
 				try {
@@ -435,11 +435,7 @@ class Connection extends Thread {
 					System.out.println("*** Reconnecting to rmiServer" + e1.getMessage());
 				}
 			} catch (IOException e) {
-				try {
-					Server.dataBaseServer.removeUserFromAllChats(user);
-				} catch (RemoteException e1) {
-					System.out.println("\n*** removing from chat");
-				}
+				disconnectClient();
 				System.out.println("\n*** IO Receiving request from " + user + ": " + e.getMessage());
 				return;
 			}
@@ -526,6 +522,7 @@ class Connection extends Thread {
 		while (sucess == false) {
 			try {
 				System.out.println("->> Server: Sending all current meeting of " + this.user);
+				System.out.println(Server.dataBaseServer.getListCurrentMeetings(user));
 				out.writeUTF(Server.dataBaseServer.getListCurrentMeetings(user));
 				sucess = true;
 			} catch (RemoteException e) {
@@ -912,9 +909,9 @@ class Connection extends Thread {
 		}
 		
 	}
-
+	
 	public void sendListActionItensFromMeeting() {
-
+		
 		System.out.println("\n->> Server: Received request to send action itens from a meeting  " + user);
 		int n = -1;
 		boolean sucess = false;
@@ -945,6 +942,7 @@ class Connection extends Thread {
 	public void sendChatHistoryFromAgendaItem() {
 		int n = -1;
 		boolean sucess = false;
+		ArrayList<Connection> clientsOnChat = new ArrayList<>();
 		synchronized (Server.dataBaseServer) {
 			while (sucess == false) {
 				try {
@@ -957,7 +955,16 @@ class Connection extends Thread {
 					out.writeUTF(Server.dataBaseServer.getChatHistoryFromAgendaItem(n));
 					System.out.println("->> Server: Agenda item messages sended with sucess ..");
 					sucess = true;
-					Server.dataBaseServer.addClientToChat(n, user);
+					System.out.println("->> Server: Client added with sucess: " + Server.dataBaseServer.addClientToChat(n, user));
+					for (Connection userOn : Server.onlineUsers) {
+						if (Server.dataBaseServer.testIfUserIsOnChat(n, userOn.user)) {
+							clientsOnChat.add(userOn);
+						}
+					}
+					for (Connection outs : clientsOnChat) {
+						System.out.println("->> Server: Broadcasting message to " + outs.user);
+						outs.out.writeUTF(String.format("%s as entered the chat..", this.user));
+					}
 				} catch (RemoteException e) {
 					try {
 						Server.connectToRmi();
@@ -972,7 +979,7 @@ class Connection extends Thread {
 			}
 		}
 	}
-			
+	
 	public void addMessageToAgendaItemChat() {
 		int n = -1;
 		boolean sucess = false;
@@ -999,7 +1006,7 @@ class Connection extends Thread {
 						}
 						for (Connection outs : clientsOnChat) {
 							System.out.println("->> Server: Broadcasting message to " + outs.user);
-							outs.out.writeUTF(messageReaded.concat("\n"));
+							outs.out.writeUTF(String.format("%s: %s", this.user, messageReaded));
 						}
 					} else
 						System.out.println("->> Server: Message not send with sucess ..");
@@ -1021,11 +1028,24 @@ class Connection extends Thread {
 	
 	public void removeUserFromChat() {
 		boolean sucess = false;
+		int id_agenda_item = 0;
+		ArrayList<Connection> clientsOnChat = new ArrayList<>();
 		while (sucess == false) {
 			try {
 				out.writeUTF("");
 				System.out.println("\n->> Server: leaving chat ..");
-				Server.dataBaseServer.removeUserFromAllChats(user);
+				id_agenda_item = Server.dataBaseServer.removeUserFromAllChats(user);
+				if (id_agenda_item != 0) {
+					for (Connection userOn : Server.onlineUsers) {
+						if (Server.dataBaseServer.testIfUserIsOnChat(id_agenda_item, userOn.user)) {
+							clientsOnChat.add(userOn);
+						}
+					}
+					for (Connection outs : clientsOnChat) {
+						System.out.println("->> Server: Broadcasting message to " + outs.user);
+						outs.out.writeUTF(String.format("%s as left the chat..", this.user));
+					}
+				}
 				sucess = true;
 			} catch (RemoteException e) {
 				try {
@@ -1079,7 +1099,7 @@ class Connection extends Thread {
 					n = in.read();
 				if (invitedUser == null)
 					invitedUser = in.readUTF();
-				out.writeBoolean(Server.dataBaseServer.inviteUserToMeeting(invitedUser,n));
+				out.writeBoolean(Server.dataBaseServer.inviteUserToMeeting(invitedUser, n));
 				sucess = true;
 			} catch (RemoteException e) {
 				try {
@@ -1137,4 +1157,3 @@ class Connection extends Thread {
 		}
 	}
 }
-
